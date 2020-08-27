@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PrzelewyQR": {
+      "commandName": "Executable",
+      "executablePath": "C:\\repos\\soneta\\bin\\Debug\\SonetaExplorer.exe"
+    }
+  }
+}
