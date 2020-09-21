@@ -21,21 +21,18 @@ using System.Text.RegularExpressions;
 
 namespace PrzelewyQR
 {
-    public class PrzelewQR : ContextBase, INewBarCode 
-    {
-
-        private readonly PodmiotKasowyLookupHelper _podmiotLookup;
-        private RachunekBankowyFirmy _rachunek;
-        private IPodmiotKasowy _podmiot;
+    public class PrzelewQR : INewBarCode 
+    {   
         private Dictionary<string, string> _qr;
         private string[] _nazwyPozycji;
+        private Context _context;
 
-
-        public PrzelewQR(Context context) : base(context)
+        public PrzelewQR()
         {
-            Rachunek = (RachunekBankowyFirmy)KasaModule.GetInstance(Context).EwidencjeSP.RachunekBankowy;
-            _podmiotLookup = new PodmiotKasowyLookupHelper();
             _qr = new Dictionary<string, string>();
+
+            //Pozycje spisane zgodnie z rekomendacją związku banków polskich
+            //https://zbp.pl/getmedia/1d7fef90-d193-4a2d-a1c3-ffdf1b0e0649/2013-12-03_-_Rekomendacja_-_Standard_2D
             _nazwyPozycji = new string[]
             {
                 "Identyfikator Odbiorcy",
@@ -50,35 +47,23 @@ namespace PrzelewyQR
             };
         }
 
-        public RachunekBankowyFirmy Rachunek 
-        { 
-           get => _rachunek;
-           set
-            {
-                _rachunek = value;
-                OnChanged(new EventArgs());
-            }
-        }
-
-        public object GetListRachunek()
-                    => KasaModule.GetInstance(Context).EwidencjeSP.GetModernLookup(EwidencjeSP.ModernViewArgs.Rachunki());
-
-
-        public IPodmiotKasowy Podmiot
+        [Context]
+        public Context Context
         {
-            get => _podmiot;
+            get { return _context; }
             set
             {
-                _podmiot = value;
-                OnChanged(new EventArgs());
+                _context = value;
+                if (!Context.Contains(typeof(PrzelewQRParams)))
+                    Context.Set(new PrzelewQRParams(Context));
             }
         }
 
-        public object GetListPodmiot()
-            => _podmiotLookup.GetList(Context.Session, PodmiotKasowyLookupTyp.Kontrahenci);
-
+        //W tym miejscu wykonujemy operacje odczytania danych z kodu, a następnie dodania nowej pozycji przelewowej
         public object Enter(Context cx, string code, double quantity)
-        {       
+        {
+            PrzelewQRParams prms = (PrzelewQRParams)Context[typeof(PrzelewQRParams), false];
+
             string[] splitCode = code.Split('|');
 
             for (int i = 0; i < splitCode.Length; i++)
@@ -102,7 +87,7 @@ namespace PrzelewyQR
 
             using (ITransaction t = cx.Session.Logout(true))
             {
-                var przelew = cx.Session.AddRow(new Przelew(Rachunek));
+                var przelew = cx.Session.AddRow(new Przelew(prms.Rachunek));
 
                 przelew.Podmiot = podmiot;
                 przelew.Rachunek = rachunekBankowyPodmiotu;
@@ -116,37 +101,75 @@ namespace PrzelewyQR
             cx.Session.InvokeChanged();
 
             return FormAction.None;
-
         }
 
+        //Miejsce konfigurowania viewinfo na potrzeby formularza
         public ViewInfo PrzelewyViewInfo
         {
             get
             {
                 var vi = new ViewInfo();
 
-                vi.InitContext += (sender, args) =>
-                {
-
-                };
-
                 vi.CreateView += (sender, args) =>
                 {
+                   PrzelewQRParams prms = (PrzelewQRParams)Context[typeof(PrzelewQRParams), false];
+
                    var kasa = args.Context.Session.GetKasa();
 
                    var view = kasa.Przelewy.WgPodmiot.CreateView();
 
-                   if (Rachunek != null)
-                      view.Condition &= new FieldCondition.Equal("EwidencjaSP", Rachunek);
+                   if (prms.Rachunek != null)
+                      view.Condition &= new FieldCondition.Equal("EwidencjaSP", prms.Rachunek);
                             
-                   if (Podmiot != null)
-                      view.Condition &= new FieldCondition.Equal("Podmiot", Podmiot);
+                   if (prms.Podmiot != null)
+                      view.Condition &= new FieldCondition.Equal("Podmiot", prms.Podmiot);
 
                    args.View = view;
                 };
 
                 return vi;
             }
+        }
+
+        //Klasa parametrów
+        private class PrzelewQRParams : ContextBase
+        {
+            private readonly PodmiotKasowyLookupHelper _podmiotLookup;
+            private RachunekBankowyFirmy _rachunek;
+            private IPodmiotKasowy _podmiot;
+
+            public PrzelewQRParams(Context context) : base(context)
+            {
+                Rachunek = (RachunekBankowyFirmy)KasaModule.GetInstance(Context).EwidencjeSP.RachunekBankowy;
+                _podmiotLookup = new PodmiotKasowyLookupHelper();
+            }
+
+            public RachunekBankowyFirmy Rachunek
+            {
+                get => _rachunek;
+                set
+                {
+                    _rachunek = value;
+                    OnChanged(new EventArgs());
+                }
+            }
+
+            public object GetListRachunek()
+                        => KasaModule.GetInstance(Context).EwidencjeSP.GetModernLookup(EwidencjeSP.ModernViewArgs.Rachunki());
+
+
+            public IPodmiotKasowy Podmiot
+            {
+                get => _podmiot;
+                set
+                {
+                    _podmiot = value;
+                    OnChanged(new EventArgs());
+                }
+            }
+
+            public object GetListPodmiot()
+                => _podmiotLookup.GetList(Context.Session, PodmiotKasowyLookupTyp.Kontrahenci);
         }
     }
 }

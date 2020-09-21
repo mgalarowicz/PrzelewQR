@@ -6,9 +6,9 @@
         Priority="100000">
   <Page CaptionHtml="Skaner" DataContext="{DataSource}">
     <Group CaptionHtml="Przelewy" Class="Expanded">  
-      <Flow Name="QRFiltry">
-        <Field CaptionHtml="Z Rachunku" Width="25" EditValue="{Rachunek}" />
-        <!--<Field CaptionHtml="Podmiot" Width="25" EditValue="{Podmiot}" />-->
+      <Flow Name="QRFiltry" DataContext="{Context}">
+        <Field CaptionHtml="Z Rachunku" Width="25" EditValue="{PrzelewQR+PrzelewQRParams.Rachunek}" />
+        <!--<Field CaptionHtml="Podmiot" Width="25" EditValue="{PrzelewQR+PrzelewQRParams.Podmiot}" />-->
       </Flow>
       <Grid Width="*" Height="*" EditValue="{PrzelewyViewInfo}" IsToolbarVisible="true" EditButton="Visible" NewButton="None" RemoveButton="None">
         <Field CaptionHtml="Data" Width="9" EditValue="{Data}" Footer="None" />
